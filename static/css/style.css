@@ -1,0 +1,101 @@
+/* Semaforización de filas */
+.semaforo-rojo {
+    background-color: #f8d7da !important;
+    border-left: 4px solid #dc3545;
+}
+
+.semaforo-amarillo {
+    background-color: #fff3cd !important;
+    border-left: 4px solid #ffc107;
+}
+
+.semaforo-verde {
+    background-color: #d1e7dd !important;
+    border-left: 4px solid #198754;
+}
+
+.semaforo-pagado {
+    background-color: #cff4fc !important;
+    border-left: 4px solid #0dcaf0;
+}
+
+.semaforo-sin_fecha {
+    background-color: #e2e3e5 !important;
+    border-left: 4px solid #6c757d;
+}
+
+/* Tarjetas de estadísticas */
+.stat-card {
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* Indicador de semáforo en tarjetas */
+.semaforo-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-bottom: 5px;
+}
+
+/* Búsqueda */
+.search-results-dropdown {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+/* Tabla */
+.table th {
+    white-space: nowrap;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-weight: bold;
+}
+
+#searchInput {
+    min-width: 250px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stat-card .card-body h3 {
+        font-size: 1.2rem;
+    }
+
+    #searchInput {
+        min-width: 150px;
+    }
+}

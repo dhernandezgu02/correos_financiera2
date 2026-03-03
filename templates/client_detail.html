@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}{{ client.nombre }} - Cartera CNC{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-person"></i> {{ client.nombre }}
+                </h5>
+                {% if client.semaforo == 'rojo' %}
+                    <span class="badge bg-danger fs-6">VENCIDO</span>
+                {% elif client.semaforo == 'amarillo' %}
+                    <span class="badge bg-warning text-dark fs-6">POR VENCER</span>
+                {% elif client.semaforo == 'verde' %}
+                    <span class="badge bg-success fs-6">AL DIA</span>
+                {% elif client.semaforo == 'pagado' %}
+                    <span class="badge bg-info fs-6">PAGADO</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr><th>NIT</th><td>{{ client.nit }}-{{ client.dig_ver }}</td></tr>
+                            <tr><th>Ciudad</th><td>{{ client.ciudad }}</td></tr>
+                            <tr><th>Telefono 1</th><td>{{ client.telefono_1 }}</td></tr>
+                            <tr><th>Telefono 2</th><td>{{ client.telefono_2 }}</td></tr>
+                            <tr><th>Cobrador</th><td>{{ client.cobrador }}</td></tr>
+                            <tr><th>Centro Costo</th><td>{{ client.centro_costo }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr><th>Comprobante</th><td>{{ client.comprobante }}</td></tr>
+                            <tr><th>Cuenta</th><td>{{ client.cuenta }}</td></tr>
+                            <tr><th>Descripcion</th><td>{{ client.descripcion }}</td></tr>
+                            <tr><th>Fecha Factura</th><td>{{ client.fecha_factura | date_format }}</td></tr>
+                            <tr><th>Fecha Vencimiento</th><td>{{ client.fecha_vencimiento | date_format }}</td></tr>
+                            <tr>
+                                <th>Dias para vencer</th>
+                                <td>
+                                    {% if client.dias_para_vencer is not none %}
+                                        {% if client.dias_para_vencer < 0 %}
+                                            <span class="text-danger fw-bold">{{ client.dias_para_vencer }} dias (vencido)</span>
+                                        {% else %}
+                                            <span class="text-success">{{ client.dias_para_vencer }} dias</span>
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <h6>Desglose de Cartera</h6>
+                        <table class="table table-bordered table-sm text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Saldo Total</th>
+                                    <th>Total Vencido</th>
+                                    <th>&gt;360 dias</th>
+                                    <th>359-91 dias</th>
+                                    <th>90-60 dias</th>
+                                    <th>59-30 dias</th>
+                                    <th>&lt;29 dias</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold">{{ client.saldo | currency }}</td>
+                                    <td class="text-danger">{{ client.total | currency }}</td>
+                                    <td>{{ client.rango_360 | currency }}</td>
+                                    <td>{{ client.rango_359_91 | currency }}</td>
+                                    <td>{{ client.rango_90_60 | currency }}</td>
+                                    <td>{{ client.rango_59_30 | currency }}</td>
+                                    <td>{{ client.rango_29 | currency }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial de correos -->
+        <div class="card shadow">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-envelope"></i> Historial de Correos Enviados</h6>
+            </div>
+            <div class="card-body">
+                {% if emails %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in emails %}
+                        <tr>
+                            <td>{{ log.fecha_envio.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ log.tipo }}</td>
+                            <td>
+                                {% if log.estado_envio == 'enviado' %}
+                                    <span class="badge bg-success">Enviado</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Error</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No se han enviado correos a este cliente.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel lateral: acciones -->
+    <div class="col-md-4">
+        <!-- Estado de pago -->
+        <div class="card shadow mb-3">
+            <div class="card-header bg-dark text-white">
+                <h6 class="mb-0"><i class="bi bi-cash"></i> Estado de Pago</h6>
+            </div>
+            <div class="card-body">
+                {% if client.pagado %}
+                    <div class="alert alert-info mb-2">
+                        <i class="bi bi-check-circle"></i> Pagado el {{ client.fecha_pago | date_format }}
+                    </div>
+                    <form method="POST" action="{{ url_for('mark_unpaid', client_id=client.id) }}">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="bi bi-arrow-counterclockwise"></i> Desmarcar Pago
+                        </button>
+                    </form>
+                {% else %}
+                    <p class="text-muted">Este cliente aun no ha pagado.</p>
+                    <form method="POST" action="{{ url_for('mark_paid', client_id=client.id) }}">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-check-lg"></i> Marcar como Pagado
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Email -->
+        <div class="card shadow mb-3">
+            <div class="card-header bg-dark text-white">
+                <h6 class="mb-0"><i class="bi bi-envelope"></i> Email del Cliente</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_email', client_id=client.id) }}">
+                    <div class="mb-2">
+                        <input type="email" class="form-control" name="email" value="{{ client.email or '' }}" placeholder="correo@ejemplo.com">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-save"></i> Guardar Email
+                    </button>
+                </form>
+                {% if client.email and not client.pagado %}
+                <form method="POST" action="{{ url_for('send_single_email', client_id=client.id) }}"
+                      onsubmit="return confirm('Enviar correo de recordatorio a {{ client.email }}?')">
+                    <button type="submit" class="btn btn-outline-warning w-100">
+                        <i class="bi bi-send"></i> Enviar Correo Ahora
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-arrow-left"></i> Volver al Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

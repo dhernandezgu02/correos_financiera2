@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Cartera CNC{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard de Cartera</h2>
+
+<!-- Tarjetas de resumen -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card stat-card border-secondary">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Total Registros</h6>
+                <h3>{{ stats.total + stats.pagados }}</h3>
+                <small class="text-muted">{{ stats.monto_total | currency }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card border-danger">
+            <div class="card-body text-center">
+                <div class="semaforo-indicator bg-danger"></div>
+                <h6 class="text-danger">Vencidos</h6>
+                <h3 class="text-danger">{{ stats.vencidos }}</h3>
+                <small class="text-danger">{{ stats.monto_vencidos | currency }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card border-warning">
+            <div class="card-body text-center">
+                <div class="semaforo-indicator bg-warning"></div>
+                <h6 class="text-warning">Por Vencer (30d)</h6>
+                <h3 class="text-warning">{{ stats.por_vencer }}</h3>
+                <small class="text-warning">{{ stats.monto_por_vencer | currency }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card border-success">
+            <div class="card-body text-center">
+                <div class="semaforo-indicator bg-success"></div>
+                <h6 class="text-success">Al Dia</h6>
+                <h3 class="text-success">{{ stats.al_dia }}</h3>
+                <small class="text-success">{{ stats.monto_al_dia | currency }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card border-info">
+            <div class="card-body text-center">
+                <div class="semaforo-indicator bg-info"></div>
+                <h6 class="text-info">Pagados</h6>
+                <h3 class="text-info">{{ stats.pagados }}</h3>
+                <small class="text-info">{{ stats.monto_pagados | currency }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Búsqueda activa -->
+{% if buscar %}
+<div class="alert alert-secondary d-flex justify-content-between align-items-center mb-3">
+    <span>
+        <i class="bi bi-search"></i> Buscando: <strong>"{{ buscar }}"</strong>
+        <span class="text-muted">({{ clients | length }} resultados)</span>
+    </span>
+    <a href="{{ url_for('dashboard', filtro=filtro) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-x-lg"></i> Limpiar busqueda
+    </a>
+</div>
+{% endif %}
+
+<!-- Filtros y acciones -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="btn-group" role="group">
+        <a href="?filtro=todos{% if buscar %}&buscar={{ buscar }}{% endif %}" class="btn btn-outline-secondary {% if filtro == 'todos' %}active{% endif %}">
+            Todos
+        </a>
+        <a href="?filtro=rojo{% if buscar %}&buscar={{ buscar }}{% endif %}" class="btn btn-outline-danger {% if filtro == 'rojo' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger"></i> Vencidos
+        </a>
+        <a href="?filtro=amarillo{% if buscar %}&buscar={{ buscar }}{% endif %}" class="btn btn-outline-warning {% if filtro == 'amarillo' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-warning"></i> Por Vencer
+        </a>
+        <a href="?filtro=verde{% if buscar %}&buscar={{ buscar }}{% endif %}" class="btn btn-outline-success {% if filtro == 'verde' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success"></i> Al Dia
+        </a>
+        <a href="?filtro=pagado{% if buscar %}&buscar={{ buscar }}{% endif %}" class="btn btn-outline-info {% if filtro == 'pagado' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-info"></i> Pagados
+        </a>
+    </div>
+
+    {% if clients and filtro != 'pagado' %}
+    <div class="d-flex gap-2 align-items-center">
+        <span id="selectedCount" class="text-muted small"></span>
+        <button type="button" id="btnSendSelected" class="btn btn-primary btn-sm" disabled onclick="sendSelectedEmails()">
+            <i class="bi bi-envelope"></i> Enviar a Seleccionados (<span id="countSelected">0</span>)
+        </button>
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="sendFilteredEmails()">
+            <i class="bi bi-envelope-fill"></i> Enviar a Todo el Filtro ({{ clients | length }})
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Formulario oculto para envío de correos -->
+<form id="emailForm" method="POST" action="{{ url_for('send_emails') }}" style="display:none;">
+    <input type="hidden" name="filtro" value="{{ filtro }}">
+    <input type="hidden" name="buscar" value="{{ buscar }}">
+    <div id="emailClientIds"></div>
+</form>
+
+<!-- Tabla de clientes -->
+<div class="table-responsive">
+    <table class="table table-hover table-sm">
+        <thead class="table-dark">
+            <tr>
+                {% if filtro != 'pagado' %}
+                <th class="text-center" style="width: 40px;">
+                    <input type="checkbox" id="selectAll" class="form-check-input" title="Seleccionar todos">
+                </th>
+                {% endif %}
+                <th>Estado</th>
+                <th>NIT</th>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Ciudad</th>
+                <th>Saldo</th>
+                <th>Total Vencido</th>
+                <th>Fecha Vencimiento</th>
+                <th>Dias</th>
+                <th>Comprobante</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for client in clients %}
+            <tr class="semaforo-{{ client.semaforo }}">
+                {% if filtro != 'pagado' %}
+                <td class="text-center">
+                    {% if client.email and not client.pagado %}
+                    <input type="checkbox" class="form-check-input client-checkbox" value="{{ client.id }}"
+                           data-email="{{ client.email }}">
+                    {% else %}
+                    <i class="bi bi-envelope-x text-muted" title="Sin email"></i>
+                    {% endif %}
+                </td>
+                {% endif %}
+                <td>
+                    {% if client.semaforo == 'rojo' %}
+                        <span class="badge bg-danger">Vencido</span>
+                    {% elif client.semaforo == 'amarillo' %}
+                        <span class="badge bg-warning text-dark">Por Vencer</span>
+                    {% elif client.semaforo == 'verde' %}
+                        <span class="badge bg-success">Al Dia</span>
+                    {% elif client.semaforo == 'pagado' %}
+                        <span class="badge bg-info">Pagado</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Sin Fecha</span>
+                    {% endif %}
+                </td>
+                <td>{{ client.nit }}</td>
+                <td>{{ client.nombre }}</td>
+                <td>
+                    {% if client.email %}
+                        <small>{{ client.email }}</small>
+                    {% else %}
+                        <small class="text-muted">Sin email</small>
+                    {% endif %}
+                </td>
+                <td>{{ client.ciudad }}</td>
+                <td class="text-end">{{ client.saldo | currency }}</td>
+                <td class="text-end">{{ client.total | currency }}</td>
+                <td>{{ client.fecha_vencimiento | date_format }}</td>
+                <td>
+                    {% if client.dias_para_vencer is not none %}
+                        {% if client.dias_para_vencer < 0 %}
+                            <span class="text-danger fw-bold">{{ client.dias_para_vencer }} dias</span>
+                        {% elif client.dias_para_vencer <= 30 %}
+                            <span class="text-warning fw-bold">{{ client.dias_para_vencer }} dias</span>
+                        {% else %}
+                            <span class="text-success">{{ client.dias_para_vencer }} dias</span>
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td><small>{{ client.comprobante }}</small></td>
+                <td>
+                    <a href="{{ url_for('client_detail', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if not clients %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+    <p class="mt-2">No hay registros. <a href="{{ url_for('upload') }}">Carga un archivo Excel</a> para comenzar.</p>
+</div>
+{% endif %}
+
+<!-- Modal de confirmación -->
+<div class="modal fade" id="confirmEmailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-envelope"></i> Confirmar Envio de Correos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Se enviara un correo de recordatorio de pago a cada cliente con email registrado.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmSendBtn">
+                    <i class="bi bi-send"></i> Confirmar Envio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Seleccionar/Deseleccionar todos
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.client-checkbox').forEach(cb => {
+                cb.checked = this.checked;
+            });
+            updateSelectedCount();
+        });
+    }
+
+    // Actualizar conteo al cambiar checkboxes individuales
+    document.querySelectorAll('.client-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+});
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.client-checkbox:checked');
+    const count = checked.length;
+    const btn = document.getElementById('btnSendSelected');
+    const countSpan = document.getElementById('countSelected');
+
+    if (btn) {
+        btn.disabled = count === 0;
+        countSpan.textContent = count;
+    }
+}
+
+function sendSelectedEmails() {
+    const checked = document.querySelectorAll('.client-checkbox:checked');
+    if (checked.length === 0) return;
+
+    const modal = new bootstrap.Modal(document.getElementById('confirmEmailModal'));
+    document.getElementById('confirmMessage').innerHTML =
+        `<strong>Se enviaran correos a ${checked.length} cliente(s) seleccionado(s).</strong>`;
+
+    document.getElementById('confirmSendBtn').onclick = function() {
+        const form = document.getElementById('emailForm');
+        const container = document.getElementById('emailClientIds');
+        container.innerHTML = '';
+
+        checked.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'client_ids';
+            input.value = cb.value;
+            container.appendChild(input);
+        });
+
+        form.submit();
+    };
+
+    modal.show();
+}
+
+function sendFilteredEmails() {
+    const total = {{ clients | length }};
+    const filtro = '{{ filtro }}';
+    const filtroName = {
+        'todos': 'todos los clientes pendientes',
+        'rojo': 'los clientes VENCIDOS',
+        'amarillo': 'los clientes POR VENCER',
+        'verde': 'los clientes AL DIA'
+    }[filtro] || 'los clientes del filtro actual';
+
+    const modal = new bootstrap.Modal(document.getElementById('confirmEmailModal'));
+    document.getElementById('confirmMessage').innerHTML =
+        `<strong>Se enviaran correos a ${filtroName} (${total} registros).</strong><br>
+         <small class="text-muted">Solo se enviara a quienes tengan email registrado y no hayan pagado.</small>`;
+
+    document.getElementById('confirmSendBtn').onclick = function() {
+        const form = document.getElementById('emailForm');
+        document.getElementById('emailClientIds').innerHTML = '';
+        form.submit();
+    };
+
+    modal.show();
+}
+</script>
+{% endblock %}
