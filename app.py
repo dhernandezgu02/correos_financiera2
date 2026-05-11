@@ -317,8 +317,4 @@ def date_format_filter(value):
 
 
 if __name__ == '__main__':
-    # Importar y arrancar el scheduler
-    from scheduler import init_scheduler
-    init_scheduler(app)
-
     app.run(debug=True, port=3000, host="0.0.0.0")
