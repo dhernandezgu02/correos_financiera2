@@ -104,7 +104,7 @@ def send_reminder_email(client):
         msg.attach(MIMEText(html_body, 'html'))
 
         context = ssl.create_default_context()
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as server:
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=15) as server:
             server.ehlo()
             server.starttls(context=context)
             server.ehlo()
