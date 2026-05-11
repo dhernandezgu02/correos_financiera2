@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -102,8 +103,11 @@ def send_reminder_email(client):
         html_body = build_email_body(client)
         msg.attach(MIMEText(html_body, 'html'))
 
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
-            server.starttls()
+        context = ssl.create_default_context()
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
             server.login(config.SMTP_USER, config.SMTP_PASSWORD)
             server.sendmail(msg['From'], [client.email], msg.as_string())
 
