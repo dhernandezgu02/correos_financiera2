@@ -17,11 +17,12 @@ UPLOAD_FOLDER = '/tmp/uploads' if os.environ.get('VERCEL') else os.path.join(BAS
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
 
 # Email SMTP (Outlook/Office365)
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.office365.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER', 'jrocha@cnccol.com')  # Configurar con tu email
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'Consultoria2025*')  # Configurar con tu contraseña
-SMTP_FROM = os.environ.get('SMTP_FROM', 'jrocha@cnccol.com')  # Email remitente
+SMTP_HOST = os.environ.get('MAIL_HOST', 'smtp.office365.com')
+SMTP_PORT = int(os.environ.get('MAIL_PORT', 587))
+SMTP_USER = os.environ.get('MAIL_USERNAME', 'jrocha@cnccol.com')
+SMTP_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
+SMTP_FROM = os.environ.get('MAIL_FROM_ADDRESS', 'jrocha@cnccol.com')
+SMTP_FROM_NAME = os.environ.get('MAIL_FROM_NAME', 'CNC Cartera')
 
 # Scheduler
 EMAIL_INTERVAL_DAYS = 3

@@ -97,7 +97,9 @@ def send_reminder_email(client):
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = f'Recordatorio de Pago - CNC - {client.comprobante}'
-        msg['From'] = config.SMTP_FROM or config.SMTP_USER
+        from_name = config.SMTP_FROM_NAME or 'CNC Cartera'
+        from_addr = config.SMTP_FROM or config.SMTP_USER
+        msg['From'] = f"{from_name} <{from_addr}>"
         msg['To'] = client.email
 
         html_body = build_email_body(client)
