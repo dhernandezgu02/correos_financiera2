@@ -16,12 +16,9 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 UPLOAD_FOLDER = '/tmp/uploads' if os.environ.get('VERCEL') else os.path.join(BASE_DIR, 'uploads')
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
 
-# Email SMTP (Outlook/Office365)
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.office365.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER', 'jrocha@cnccol.com')  # Configurar con tu email
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'Consultoria2025*')  # Configurar con tu contraseña
-SMTP_FROM = os.environ.get('SMTP_FROM', 'jrocha@cnccol.com')  # Email remitente
+# Email (Resend)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', 'Cartera CNC <cartera@cnccol.com>')
 
 # Scheduler
 EMAIL_INTERVAL_DAYS = 3
