@@ -1,4 +1,9 @@
-import resend
+import smtplib
+import ssl
+import socket
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import config
 
@@ -88,21 +93,34 @@ def send_reminder_email(client):
     if not client.email:
         return False, "Cliente sin email registrado"
 
-    if not config.RESEND_API_KEY:
-        return False, "Resend API key no configurada"
+    if not config.SMTP_USER or not config.SMTP_PASSWORD:
+        return False, "SMTP no configurado"
 
     try:
-        resend.api_key = config.RESEND_API_KEY
-        html_body = build_email_body(client)
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f'Recordatorio de Pago - CNC - {client.comprobante}'
+        msg['From'] = config.SMTP_FROM or config.SMTP_USER
+        msg['To'] = client.email
 
-        params = {
-            "from": config.SMTP_FROM,
-            "to": [client.email],
-            "subject": f"Recordatorio de Pago - CNC - {client.comprobante}",
-            "html": html_body,
-        }
-        resend.Emails.send(params)
+        html_body = build_email_body(client)
+        msg.attach(MIMEText(html_body, 'html'))
+
+        def _send():
+            context = ssl.create_default_context()
+            with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
+                server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+                server.sendmail(msg['From'], [client.email], msg.as_string())
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_send)
+            future.result(timeout=20)
+
         return True, "Enviado exitosamente"
 
+    except FuturesTimeout:
+        return False, "Tiempo de espera agotado al conectar con el servidor de correo"
     except Exception as e:
         return False, str(e)
