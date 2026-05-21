@@ -103,11 +103,12 @@ def extract_nit(nit_raw):
     return digits if digits else nit_str
 
 
-def load_excel(filepath, filename):
+def load_excel(filepath, filename, progress_callback=None):
     """Carga un archivo Excel y retorna los clientes parseados."""
     wb = openpyxl.load_workbook(filepath, data_only=True)
     ws = wb.active
 
+    total_rows = max(ws.max_row - 7, 0)
     clients_added = 0
     clients_updated = 0
     errors = []
@@ -177,6 +178,9 @@ def load_excel(filepath, filename):
 
         except Exception as e:
             errors.append(f"Fila {row_num}: {str(e)}")
+
+        if progress_callback:
+            progress_callback(row_num - 7, total_rows)
 
     db.session.commit()
     wb.close()

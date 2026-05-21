@@ -1,10 +1,15 @@
 import os
+import threading
+import uuid
 from datetime import date, datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from models import db, Client, EmailLog
 from excel_loader import load_excel
 import config
+
+# {job_id: {status, current, total_rows, result, error}}
+_upload_jobs = {}
 
 app = Flask(__name__)
 app.config.from_object(config)
@@ -111,36 +116,62 @@ def dashboard():
     return render_template('dashboard.html', clients=clients, stats=stats, filtro=filtro, buscar=buscar, today=today)
 
 
+def _run_excel_job(flask_app, job_id, filepath, filename):
+    with flask_app.app_context():
+        def on_progress(current, total):
+            _upload_jobs[job_id]['current'] = current
+            _upload_jobs[job_id]['total_rows'] = total
+
+        try:
+            result = load_excel(filepath, filename, progress_callback=on_progress)
+            _upload_jobs[job_id].update({'status': 'done', 'result': result})
+        except Exception as exc:
+            _upload_jobs[job_id].update({'status': 'error', 'error': str(exc)})
+
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
         if 'file' not in request.files:
-            flash('No se seleccionó ningún archivo', 'danger')
-            return redirect(request.url)
+            return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
 
         file = request.files['file']
         if file.filename == '':
-            flash('No se seleccionó ningún archivo', 'danger')
-            return redirect(request.url)
+            return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
 
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
+        if not (file and allowed_file(file.filename)):
+            return jsonify({'error': 'Tipo de archivo no permitido. Solo .xlsx o .xls'}), 400
 
-            result = load_excel(filepath, filename)
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-            if result['errors']:
-                flash(f"Cargados {result['total']} registros ({result['added']} nuevos, {result['updated']} actualizados). Errores: {len(result['errors'])}", 'warning')
-            else:
-                flash(f"Cargados exitosamente {result['total']} registros ({result['added']} nuevos, {result['updated']} actualizados)", 'success')
+        job_id = str(uuid.uuid4())
+        _upload_jobs[job_id] = {'status': 'running', 'current': 0, 'total_rows': 0}
 
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Tipo de archivo no permitido. Solo .xlsx o .xls', 'danger')
-            return redirect(request.url)
+        # Limpiar trabajos viejos si hay más de 50
+        if len(_upload_jobs) > 50:
+            for old_key in list(_upload_jobs.keys())[:-50]:
+                _upload_jobs.pop(old_key, None)
+
+        t = threading.Thread(
+            target=_run_excel_job,
+            args=(app, job_id, filepath, filename),
+            daemon=True,
+        )
+        t.start()
+
+        return jsonify({'job_id': job_id})
 
     return render_template('upload.html')
+
+
+@app.route('/upload/status/<job_id>')
+def upload_status(job_id):
+    job = _upload_jobs.get(job_id)
+    if not job:
+        return jsonify({'status': 'not_found'}), 404
+    return jsonify(job)
 
 
 @app.route('/search')

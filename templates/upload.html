@@ -9,29 +9,180 @@
                 <h5><i class="bi bi-upload"></i> Cargar Archivo Excel</h5>
             </div>
             <div class="card-body">
-                <form method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="file" class="form-label">Selecciona el archivo de cartera (.xlsx)</label>
-                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
-                        <div class="form-text">
-                            El archivo debe tener los encabezados en la fila 7 y los datos desde la fila 8.
+
+                <!-- Formulario de carga -->
+                <div id="form-section">
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Selecciona el archivo de cartera (.xlsx)</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
+                            <div class="form-text">
+                                El archivo debe tener los encabezados en la fila 7 y los datos desde la fila 8.
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Formato esperado:</strong>
+                            <ul class="mb-0 mt-1">
+                                <li>Columnas: NIT, NOMBRE, SALDO, FEC-VENCE, EMAIL, etc.</li>
+                                <li>Si un registro ya existe (mismo NIT + Comprobante), se actualizara.</li>
+                                <li>Los emails se importaran desde la columna EMAIL del Excel.</li>
+                            </ul>
+                        </div>
+                        <button type="submit" id="submit-btn" class="btn btn-primary w-100">
+                            <i class="bi bi-cloud-upload"></i> Cargar Archivo
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Barra de progreso (oculta inicialmente) -->
+                <div id="progress-section" style="display:none;">
+                    <div class="text-center mb-3">
+                        <h6 id="progress-title" class="fw-semibold text-secondary">Subiendo archivo...</h6>
+                    </div>
+                    <div class="progress mb-2" style="height:28px; border-radius:6px;">
+                        <div id="progress-bar"
+                             class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                             role="progressbar"
+                             style="width:4%; min-width:2.5rem; transition: width 0.4s ease;">
+                            <span id="progress-label" class="fw-bold small">Subiendo...</span>
                         </div>
                     </div>
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Formato esperado:</strong>
-                        <ul class="mb-0 mt-1">
-                            <li>Columnas: NIT, NOMBRE, SALDO, FEC-VENCE, EMAIL, etc.</li>
-                            <li>Si un registro ya existe (mismo NIT + Comprobante), se actualizara.</li>
-                            <li>Los emails se importaran desde la columna EMAIL del Excel.</li>
-                        </ul>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-cloud-upload"></i> Cargar Archivo
-                    </button>
-                </form>
+                    <p id="progress-detail" class="text-muted text-center small mb-0">&nbsp;</p>
+                </div>
+
+                <!-- Resultado (oculto inicialmente) -->
+                <div id="result-section" style="display:none;"></div>
+
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('upload-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('file');
+    if (!fileInput.files[0]) return;
+
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('progress-section').style.display = 'block';
+
+    const formData = new FormData(this);
+    const xhr = new XMLHttpRequest();
+
+    // Fase 1: progreso de subida (0% → 50%)
+    xhr.upload.addEventListener('progress', function (e) {
+        if (e.lengthComputable) {
+            const pct = Math.max(4, Math.round(e.loaded / e.total * 50));
+            setBar(pct, pct + '%', 'Subiendo archivo...');
+        }
+    });
+
+    xhr.addEventListener('load', function () {
+        if (xhr.status !== 200) {
+            showError('Error al subir el archivo (HTTP ' + xhr.status + '). Intenta de nuevo.');
+            return;
+        }
+        let data;
+        try { data = JSON.parse(xhr.responseText); } catch (_) {
+            showError('Respuesta inválida del servidor.');
+            return;
+        }
+        if (data.error) { showError(data.error); return; }
+        // Fase 2: polling del procesamiento (50% → 100%)
+        pollJob(data.job_id);
+    });
+
+    xhr.addEventListener('error', function () {
+        showError('Error de conexión. Verifica tu red e intenta de nuevo.');
+    });
+
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+});
+
+function pollJob(jobId) {
+    document.getElementById('progress-title').textContent = 'Procesando registros...';
+    setBar(52, '52%', 'Iniciando procesamiento...');
+
+    const timer = setInterval(async function () {
+        try {
+            const resp = await fetch('/upload/status/' + jobId);
+            const data = await resp.json();
+
+            if (data.status === 'running') {
+                const cur = data.current || 0;
+                const tot = data.total_rows || 0;
+                if (tot > 0) {
+                    const pct = 50 + Math.round(cur / tot * 50);
+                    setBar(pct, pct + '%', 'Fila ' + cur + ' de ' + tot);
+                }
+            } else if (data.status === 'done') {
+                clearInterval(timer);
+                setBar(100, '100%', 'Listo');
+                setTimeout(function () {
+                    const r = data.result || {};
+                    showSuccess(r.total || 0, r.added || 0, r.updated || 0, (r.errors || []).length);
+                }, 500);
+            } else if (data.status === 'error') {
+                clearInterval(timer);
+                showError(data.error || 'Error desconocido al procesar el archivo.');
+            }
+        } catch (_) {
+            clearInterval(timer);
+            showError('Se perdió la conexión mientras se procesaba el archivo.');
+        }
+    }, 700);
+}
+
+function setBar(pct, label, detail) {
+    const bar = document.getElementById('progress-bar');
+    bar.style.width = pct + '%';
+    document.getElementById('progress-label').textContent = label;
+    if (detail) document.getElementById('progress-detail').textContent = detail;
+    if (pct >= 100) {
+        bar.classList.remove('progress-bar-animated', 'bg-primary');
+        bar.classList.add('bg-success');
+    }
+}
+
+function showSuccess(total, added, updated, errCount) {
+    document.getElementById('progress-section').style.display = 'none';
+    const errHtml = errCount > 0
+        ? '<p class="text-warning mb-3"><i class="bi bi-exclamation-triangle"></i> ' + errCount + ' filas con errores (revisa el archivo).</p>'
+        : '';
+    render('result-section', `
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill"></i>
+            <strong>Carga exitosa</strong><br>
+            <span>${total} registros procesados &mdash; ${added} nuevos, ${updated} actualizados.</span>
+        </div>
+        ${errHtml}
+        <a href="/" class="btn btn-primary w-100">
+            <i class="bi bi-house"></i> Ir al Dashboard
+        </a>
+    `);
+}
+
+function showError(msg) {
+    document.getElementById('progress-section').style.display = 'none';
+    render('result-section', `
+        <div class="alert alert-danger">
+            <i class="bi bi-x-circle-fill"></i>
+            <strong>Error:</strong> ${msg}
+        </div>
+        <button onclick="location.reload()" class="btn btn-secondary w-100">
+            <i class="bi bi-arrow-counterclockwise"></i> Intentar de nuevo
+        </button>
+    `);
+}
+
+function render(id, html) {
+    const el = document.getElementById(id);
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+</script>
 {% endblock %}
